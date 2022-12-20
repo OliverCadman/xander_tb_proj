@@ -1,32 +1,46 @@
-import pandas as pd
+from pandas import DataFrame
 
 
-def clean_postcode(df: pd.DataFrame) -> pd.DataFrame:
+def clean_postcode(df: DataFrame) -> DataFrame:
+    """
+    Take in dirty postcode data and
+    convert to a uniform format.
 
-    d_postcode = df['Delivery Postcode']
-    b_postcode = df['Billing Postcode']
+    Postcodes that are passed in vary in format, e.g:
+        e25te
+        SE4 1YR
+        PR7%205RH
+        AL3   4SB
+
+    Clean this data such that the following postcode format is made uniform:
+        AL34SB
+    :param df - The dataframe to be modified
+    :return: Modified dataframe
+    """
 
     encoded_re = r'%\d{2}'
     whitespace_re = r'[ ]{1,}'
 
-    encoded = d_postcode.str.contains(encoded_re)
-    whitespace = b_postcode.str.contains(whitespace_re)
+    d_address = df['delivery_postcode']
+    b_address = df['billing_postcode']
 
-    dp_islower = d_postcode.str.islower()
-    bp_islower = b_postcode.str.islower()
+    dp_encoded = d_address.str.contains(encoded_re)
+    dp_whitespace = d_address.str.contains(whitespace_re)
 
-    # Remove encoding
-    df['Delivery Postcode'] = df['Delivery Postcode'].str.replace(r'%\d{2}', '').where(encoded, df['Delivery Postcode'])
-    df['Billing Postcode'] = df['Billing Postcode'].str.replace(r'[ ]{1,}', '').where(encoded, df['Billing Postcode'])
+    bp_encoded = b_address.str.contains(encoded_re)
+    bp_whitespace = b_address.str.contains(whitespace_re)
 
-    # Remove whitespace
-    df['Delivery Postcode'] = df['Delivery Postcode'].str.replace(r'[ ]{1,}', '').where(
-        whitespace, df['Delivery Postcode'])
-    df['Billing Postcode'] = df['Billing Postcode'].str.replace(r'[ ]{1,}', '').where(
-        whitespace, df['Billing Postcode'])
+    dp_islower = d_address.str.islower()
+    bp_islower = b_address.str.islower()
 
-    # Convert lowercase to upper
-    df['Delivery Postcode'] = df['Delivery Postcode'].str.upper().where(dp_islower, df['Delivery Postcode'])
-    df['Billing Postcode'] = df['Billing Postcode'].str.upper().where(bp_islower, df['Billing Postcode'])
+    # Modify columns based on given conditions
+    df['delivery_postcode'] = (d_address.str.replace(encoded_re, '')).where(dp_encoded, df['delivery_postcode'])
+    df['billing_postcode'] = (b_address.str.replace(encoded_re, '')).where(bp_encoded, df['billing_postcode'])
+
+    df['delivery_postcode'] = (d_address.str.replace(whitespace_re, '')).where(dp_whitespace, df['delivery_postcode'])
+    df['billing_postcode'] = (b_address.str.replace(whitespace_re, '')).where(bp_whitespace, df['billing_postcode'])
+
+    df['delivery_postcode'] = (df['delivery_postcode'].str.upper()).where(dp_islower, df['delivery_postcode'])
+    df['billing_postcode'] = (df['billing_postcode'].str.upper()).where(bp_islower, df['billing_postcode'])
 
     return df
