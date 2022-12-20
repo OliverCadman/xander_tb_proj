@@ -2,9 +2,7 @@ import requests
 from requests import ConnectionError, HTTPError, RequestException
 import pandas as pd
 
-import datetime
 import json
-
 
 class APIClient:
     """
@@ -14,7 +12,7 @@ class APIClient:
     """
 
     def __init__(self):
-        self.BASE_URL = 'http://0.0.0.0:8000/api/orders/'
+        self.BASE_URL = 'http://127.0.0.1:8000/api/orders/'
 
     def post(self, endpoint, df):
         """POST request handler, for orders only"""
@@ -34,7 +32,6 @@ class APIClient:
             try:
                 res = requests.post(url, data=df.to_json(orient='records'),
                                     headers={'Content-Type': 'application/json'})
-                print('RESPONSE', res.__dict__)
                 return True
             except ConnectionError as e:
                 print(f'Error connecting to API: {e}')
@@ -70,44 +67,48 @@ class APIClient:
         url = f'{self.BASE_URL}{endpoint}/'
 
         data = self.get(endpoint, filter_by_null=True)
-        ids = []
 
-        for index, item in enumerate(data):
-            order_number = item['order_number']
-            record = df.loc[df['order_number'] == order_number]
+        if data:
+            ids = []
 
-            dispatch_status = record['dispatch_status'].values[0]
-            dispatch_date = record['dispatch_date'].values[0]
-            dispatch_date = pd.to_datetime(dispatch_date)
-            t1 = dispatch_date.strftime('%Y-%m-%dT%H:%M%:%SZ')
+            for index, item in enumerate(data):
 
-            delivery_status = record['delivery_status'].values[0]
-            delivery_date = record['delivery_date'].values[0]
-            delivery_date = pd.to_datetime(delivery_date)
-            t2 = delivery_date.strftime('%Y-%m-%dT%H:%M%:%SZ')
+                order_number = item['order_number']
 
-            item_id = str(item['id'])
+                record = df.loc[df['order_number'] == order_number]
 
-            ids.append(item['id'])
+                dispatch_status = record['dispatch_status'].values[0]
+                dispatch_date = record['dispatch_date'].values[0]
+                dispatch_date = pd.to_datetime(dispatch_date)
+                t1 = dispatch_date.strftime('%Y-%m-%dT%H:%M:%SZ')
 
-            payload = {
-                'dispatch_status': dispatch_status,
-                'dispatch_date': t1,
-                'delivery_status': delivery_status,
-                'delivery_date': t2
-            }
+                delivery_status = record['delivery_status'].values[0]
+                delivery_date = record['delivery_date'].values[0]
+                delivery_date = pd.to_datetime(delivery_date)
+                t2 = delivery_date.strftime('%Y-%m-%dT%H:%M:%SZ')
 
-            requests.patch(f'{url}{item_id}/', data=json.dumps(payload),
-                           headers={'Content-Type': 'application/json'})
+                item_id = str(item['id'])
 
-        self.destroy('null_orders', ids)
-        return True
+                ids.append(item['id'])
+
+                payload = {
+                    'dispatch_status': dispatch_status,
+                    'dispatch_date': t1,
+                    'delivery_status': delivery_status,
+                    'delivery_date': t2
+                }
+
+                res = requests.patch(f'{url}{item_id}/', data=json.dumps(payload),
+                                     headers={'Content-Type': 'application/json'})
+                print(f'{endpoint} updated with status {res.status_code}', res.content)
+
+            return 'Null order table updated'
+        else:
+            return 'No data found.'
 
     def destroy(self, endpoint, ids):
-        print('IDS', ids)
 
         my_lst_str = ','.join(map(str, ids))
-        print(my_lst_str)
 
         url = f'{self.BASE_URL}{endpoint}/delete/'
         if ids:

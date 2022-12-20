@@ -18,8 +18,7 @@ def main():
     warnings.filterwarnings('ignore')
     # set path or use working directory
     path = os.getcwd() + '/'
-    # setting the size of the data
-    n = np.random.choice(range(5000, 10000))
+
     # set if doing a full dump
     full_dump = False
 
@@ -31,7 +30,7 @@ def main():
         # setting the size of the data
         n = np.random.choice(range(5000, 10000))
         start_date = pd.to_datetime('2021-01-01')
-        print('START DATE', start_date)
+
         end_date = pd.to_datetime(dt.date.today())
         max_id = 0
         df = generate_order_number(max_id, max_id + n, [])
@@ -40,14 +39,13 @@ def main():
 
         df = clean_postcode(df)
 
-        null_df = df[df['delivery_date'].isnull()]
         full_filename = 'fulfilled_orders.csv'
         full_df = df.dropna()
-        full_df.to_csv(f'{path}/{full_filename}', index=False)
+
         S3Handler().save_to_s3(full_filename, full_df)
 
-        client.post('full_orders', full_df)
         client.post('todays_orders', df)
+        client.post('full_orders', full_df)
 
     else:
         n = np.random.choice(range(500, 1000))
@@ -57,54 +55,46 @@ def main():
         null_df, full_df, max_id = read_existing_data(path)
         # updating the delivery columns
         null_df = update_delivery_columns(null_df)
-
-        # Update columns in Database
-        client.update('todays_orders', null_df)
+        # # Update columns in Database
+        update_attempt = client.update('todays_orders', null_df)
 
         # adding order numbers to a list that already have data
         null_list = list(null_df['order_number'].str[3:].astype(int))
-
         # generating new data
-        df = generate_order_number(max_id, max_id + n, null_list)
-        print('MAX ID: ', max_id)
+        df = generate_order_number(max_id + 1, max_id + n, null_list)
+
         n = df.shape[0]
         df = add_columns(df, start_date, end_date, n, path)
         df = add_delivery_columns(df, n)
-        # adding the old data with new
-
-        df = pd.concat([df, null_df], ignore_index=True)
-
         # Clean dirty postcode data
         df = clean_postcode(df)
-
         client.post('todays_orders', df)
-        no_null_df = df.dropna()
 
+        df_copy = df.copy(deep=True)
+        no_null_df_for_post = df_copy.dropna()
+        client.post('full_orders', no_null_df_for_post)
+
+        # adding the old data with new
+        df = pd.concat([df, null_df], ignore_index=True)
+
+        no_null_df = df.dropna()
+        no_null_df.to_csv(f'{path}/no_null_df.csv', index=False)
+        #
         full_df = full_df.append(no_null_df)
-        full_filename = 'fulfilled_orders.csv'
-        full_df.to_csv(f'{path}/{full_filename}', index=False)
+        full_filename = 'fulfilled_orders1.csv'
+
         S3Handler().save_to_s3(full_filename, full_df)
 
-        print('NULL DF', null_df)
-        null_orders = null_df.to_csv(f'{path}/null_order_data1.csv', index=False)
-
-        client.post('full_orders', no_null_df)
-
-    null_df = df[df['delivery_date'].isnull()]
-    client.post('null_orders', null_df)
-    # saving data to flat files
-    file_name = f'order_data_{dt.datetime.today().strftime("%Y%m%d_%H%M")}.csv'
-    df.to_csv(f'{path}/{file_name}', index=False)
+    # # saving data to flat files
+    file_name = 'order_data_today.csv'
 
     S3Handler().save_to_s3(file_name, df)
     print('TODAYS ORDERS SAVED TO S3')
 
     # Insert completed data into DB (Table: 'todays_orders')
-    print(f'Saved file {file_name} to {path}')
+    null_df = df[df['delivery_date'].isnull()]
 
-    null_orders = null_df.to_csv(f'{path}/null_order_data.csv', index=False)
-    print(f"Saved file 'null_order_data.csv' to {path}")
-    print('NULL ORDERS:', null_orders)
+    client.post('null_orders', null_df)
 
     S3Handler().save_to_s3('null_order_data.csv', null_df)
 
@@ -118,21 +108,21 @@ def read_existing_data(path):
     full_df = None
     csv_files = S3Handler().read_from_s3()
     for file in csv_files:
-        file_name = file['filename'].split('/')[1]
-        print(file_name)
-        if file_name.startswith("null"):
+        filename = file['filename'].split('/')[1]
+        if filename.startswith("null"):
             null_df = pd.read_csv(file['body'], index_col=0)
             null_df['order_date'] = pd.to_datetime(null_df['order_date'], errors='coerce')
-        elif file_name.startswith('order_data'):
+        elif filename.startswith('order_data'):
             df = pd.read_csv(file['body'], index_col=0)
             while max_id > int(df['order_number'].str[3:].max()):
                 print(max_id, int(df['order_number'].str[3:].max()))
                 continue
             else:
                 max_id = int(df['order_number'].str[3:].max())
+            print('FILE?????', file)
             # Now delete the order_data CSV file to make way for fresh
-            S3Handler().delete_from_s3(file['filename'])
-        elif file_name.startswith('fulfilled'):
+            # S3Handler().delete_from_s3(file['filename'])
+        elif filename.startswith('fulfilled'):
             full_df = pd.read_csv(file['body'], index_col=0)
     return null_df, full_df, max_id
 
