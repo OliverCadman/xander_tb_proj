@@ -12,7 +12,7 @@ class APIClient:
     """
 
     def __init__(self):
-        self.BASE_URL = 'http://127.0.0.1:8000/api/orders/'
+        self.BASE_URL = 'http://0.0.0.0:8000/api/orders/'
 
     def post(self, endpoint, df):
         """POST request handler, for orders only"""
@@ -26,12 +26,19 @@ class APIClient:
         df['dispatch_date'] = pd.to_datetime(df['dispatch_date']).dt.strftime('%Y-%m-%dT%H:%M:%SZ')
         df['delivery_date'] = pd.to_datetime(df['delivery_date']).dt.strftime('%Y-%m-%dT%H:%M:%SZ')
 
+        # Create nested data to be readable by Django REST Framework
+        df['delivery_postcode'] = df['delivery_postcode'].apply(lambda x: {'postcode': x})
+        df['billing_postcode'] = df['billing_postcode'].apply(lambda x: {'postcode': x})
+
         call_count = 5
 
         while call_count > 0:
+
             try:
                 res = requests.post(url, data=df.to_json(orient='records'),
                                     headers={'Content-Type': 'application/json'})
+
+                print('RESPONSE', res.content)
                 return True
             except ConnectionError as e:
                 print(f'Error connecting to API: {e}')
