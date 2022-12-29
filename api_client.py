@@ -27,8 +27,16 @@ class APIClient:
         df['delivery_date'] = pd.to_datetime(df['delivery_date']).dt.strftime('%Y-%m-%dT%H:%M:%SZ')
 
         # Create nested data to be readable by Django REST Framework
-        df['delivery_postcode'] = df['delivery_postcode'].apply(lambda x: {'postcode': x})
-        df['billing_postcode'] = df['billing_postcode'].apply(lambda x: {'postcode': x})
+        df['delivery_postcode'] = (df.apply(lambda x: {
+            'postcode': x.delivery_postcode,
+            'postcode_area': x.delivery_postcode_area
+        }, axis=1))
+        df['billing_postcode'] = (df.apply(lambda x: {
+            'postcode': x.billing_postcode,
+            'postcode_area': x.billing_postcode_area
+        }, axis=1))
+
+        print(df)
 
         call_count = 5
 
@@ -38,7 +46,7 @@ class APIClient:
                 res = requests.post(url, data=df.to_json(orient='records'),
                                     headers={'Content-Type': 'application/json'})
 
-                print('RESPONSE', res.content)
+                # print('RESPONSE', res.content)
                 return True
             except ConnectionError as e:
                 print(f'Error connecting to API: {e}')
