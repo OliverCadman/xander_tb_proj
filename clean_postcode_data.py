@@ -33,6 +33,8 @@ def clean_postcode(df: DataFrame) -> DataFrame:
     dp_islower = d_address.str.islower()
     bp_islower = b_address.str.islower()
 
+    print(df['delivery_postcode'].str.split(r'\d+').str[0])
+
     # Modify columns based on given conditions
     df['delivery_postcode'] = (d_address.str.replace(encoded_re, '')).where(dp_encoded, df['delivery_postcode'])
     df['billing_postcode'] = (b_address.str.replace(encoded_re, '')).where(bp_encoded, df['billing_postcode'])
@@ -42,5 +44,8 @@ def clean_postcode(df: DataFrame) -> DataFrame:
 
     df['delivery_postcode'] = (df['delivery_postcode'].str.upper()).where(dp_islower, df['delivery_postcode'])
     df['billing_postcode'] = (df['billing_postcode'].str.upper()).where(bp_islower, df['billing_postcode'])
+
+    df['delivery_postcode_area'] = df['delivery_postcode'].str.split(r'\d+').str[0]
+    df['billing_postcode_area'] = df['billing_postcode'].str.split(r'\d+').str[0]
 
     return df
