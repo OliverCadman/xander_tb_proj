@@ -42,8 +42,10 @@ def main():
         full_filename = 'fulfilled_orders.csv'
         full_df = df.dropna()
 
-        S3Handler().save_to_s3(full_filename, full_df)
+        full_df.to_csv(f'{path}{full_filename}', index=False)
 
+        # S3Handler().save_to_s3(full_filename, full_df)
+        #
         client.post('todays_orders', df)
         client.post('full_orders', full_df)
 
@@ -81,49 +83,53 @@ def main():
         no_null_df.to_csv(f'{path}/no_null_df.csv', index=False)
         #
         full_df = full_df.append(no_null_df)
-        full_filename = 'fulfilled_orders1.csv'
+        full_filename = 'fulfilled_orders.csv'
 
-        S3Handler().save_to_s3(full_filename, full_df)
+        full_df.to_csv(f'{path}{full_filename}', index=False)
+
+        # S3Handler().save_to_s3(full_filename, full_df)
 
     # # saving data to flat files
     file_name = 'order_data_today.csv'
-
-    S3Handler().save_to_s3(file_name, df)
+    df.to_csv(f'{path}{file_name}', index=False)
+    # S3Handler().save_to_s3(file_name, df)
     print('TODAYS ORDERS SAVED TO S3')
 
     # Insert completed data into DB (Table: 'todays_orders')
     null_df = df[df['delivery_date'].isnull()]
+    null_df.to_csv(f'{path}null_orders.csv', index=False)
 
     client.post('null_orders', null_df)
 
-    S3Handler().save_to_s3('null_order_data.csv', null_df)
+    # S3Handler().save_to_s3('null_order_data.csv', null_df)
 
     print('NULL ORDERS SAVED TO S3')
 
 
 def read_existing_data(path):
     print('READING...')
+    print(os.listdir(path))
     max_id = 0
     null_df = None
     full_df = None
-    csv_files = S3Handler().read_from_s3()
-    for file in csv_files:
-        filename = file['filename'].split('/')[1]
-        if filename.startswith("null"):
-            null_df = pd.read_csv(file['body'], index_col=0)
+    # csv_files = S3Handler().read_from_s3()
+    for filename in os.listdir(path):
+        if filename.startswith("null") and filename.endswith('.csv'):
+            null_df = pd.read_csv(path + filename)
             null_df['order_date'] = pd.to_datetime(null_df['order_date'], errors='coerce')
-        elif filename.startswith('order_data'):
-            df = pd.read_csv(file['body'], index_col=0)
+        elif filename.startswith('order_data') and filename.endswith('.csv'):
+            df = pd.read_csv(path + filename)
             while max_id > int(df['order_number'].str[3:].max()):
                 print(max_id, int(df['order_number'].str[3:].max()))
                 continue
             else:
                 max_id = int(df['order_number'].str[3:].max())
-            print('FILE?????', file)
+            print('FILE?????', filename)
             # Now delete the order_data CSV file to make way for fresh
             # S3Handler().delete_from_s3(file['filename'])
-        elif filename.startswith('fulfilled'):
-            full_df = pd.read_csv(file['body'], index_col=0)
+        elif filename.startswith('fulfilled') and filename.endswith('.csv'):
+            print('READING FULL FILENAME?')
+            full_df = pd.read_csv(path + filename)
     return null_df, full_df, max_id
 
 
@@ -181,12 +187,12 @@ def add_columns(df, start_date, end_date, n, path):
     # adding quantity
     df['order_quantity'] = np.random.choice(range(1, 10), n)
 
-    postcodes = pd.read_csv(f'{path}/open_postcode_geo_min2.csv', header=None, usecols=[0], names=['postcode'])
+    postcodes = pd.read_csv(f'{path}/open_postcode_geo_min2.csv', header=None, usecols=['postcode'], names=['postcode'])
 
     # randomly choosing postcodes
     df['delivery_postcode'] = list(postcodes['postcode'].sample(n))
     # setting the billing postcode as the delivery postcode
-    df['billing_postcode'] = df['delivery_postcode']
+    df['billing_postcode'] = df[['delivery_postcode']]
 
     # randomly picking the number of records where the billing and delivery postcode are different
     postcode_split = np.random.choice(range(1, int(n / 2)), 1)[0]
