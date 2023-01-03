@@ -17,7 +17,7 @@ class APIClient:
     def post(self, endpoint, df):
         """POST request handler, for orders only"""
 
-        url = f'{self.BASE_URL}{endpoint}/'
+        url = f'{self.BASE_URL}{endpoint}'
 
         df = df.reset_index(drop=True)
 
@@ -46,7 +46,8 @@ class APIClient:
                 res = requests.post(url, data=df.to_json(orient='records'),
                                     headers={'Content-Type': 'application/json'})
 
-                # print('RESPONSE', res.content)
+                if endpoint == 'full_orders':
+                    print(res.content)
                 return True
             except ConnectionError as e:
                 print(f'Error connecting to API: {e}')
@@ -113,7 +114,7 @@ class APIClient:
                     'delivery_date': t2
                 }
 
-                res = requests.patch(f'{url}{item_id}/', data=json.dumps(payload),
+                res = requests.patch(f'{url}{item_id}', data=json.dumps(payload),
                                      headers={'Content-Type': 'application/json'})
                 print(f'{endpoint} updated with status {res.status_code}', res.content)
 
