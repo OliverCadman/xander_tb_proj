@@ -122,14 +122,11 @@ class APIClient:
         else:
             return 'No data found.'
 
-    def destroy(self, endpoint, ids):
+    def destroy(self, endpoint):
 
-        my_lst_str = ','.join(map(str, ids))
-
-        url = f'{self.BASE_URL}{endpoint}/delete/'
-        if ids:
-            res = requests.delete(url)
-            print('Destroy response:', res)
+        url = f'{self.BASE_URL}{endpoint}/delete'
+        res = requests.delete(url)
+        print('Destroy response:', res)
 
         return True
 
