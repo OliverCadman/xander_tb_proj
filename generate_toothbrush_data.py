@@ -20,7 +20,7 @@ def main():
     path = os.getcwd() + '/'
 
     # set if doing a full dump
-    full_dump = False
+    full_dump = True
 
     pd.set_option('display.max_colwidth', 60)
     pd.set_option('display.max_columns', 40)
